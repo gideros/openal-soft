@@ -3368,7 +3368,7 @@ ALC_API ALCdevice* ALC_APIENTRY alcOpenDevice(const ALCchar *deviceName)
     device->FmtType = DevFmtTypeDefault;
     device->Frequency = DEFAULT_OUTPUT_RATE;
     device->IsHeadphones = AL_FALSE;
-    device->NumUpdates = 4;
+    device->NumUpdates = 1;
     device->UpdateSize = 1024;
 
     if(!PlaybackBackend.getFactory)
@@ -3453,7 +3453,7 @@ ALC_API ALCdevice* ALC_APIENTRY alcOpenDevice(const ALCchar *deviceName)
     }
 
     ConfigValueUInt(deviceName, NULL, "periods", &device->NumUpdates);
-    device->NumUpdates = clampu(device->NumUpdates, 2, 16);
+    device->NumUpdates = clampu(device->NumUpdates, 4, 16);
 
     ConfigValueUInt(deviceName, NULL, "period_size", &device->UpdateSize);
     device->UpdateSize = clampu(device->UpdateSize, 64, 8192);
@@ -3635,7 +3635,7 @@ ALC_API ALCdevice* ALC_APIENTRY alcCaptureOpenDevice(const ALCchar *deviceName, 
     device->IsHeadphones = AL_FALSE;
 
     device->UpdateSize = samples;
-    device->NumUpdates = 1;
+    device->NumUpdates = 4;
 
     if((err=V(device->Backend,open)(deviceName)) != ALC_NO_ERROR)
     {

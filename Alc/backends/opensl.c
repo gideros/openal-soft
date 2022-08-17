@@ -51,6 +51,7 @@ typedef struct {
     ALuint curBuffer;
 
     ALuint frameSize;
+    ALboolean stopping;
 } osl_data;
 
 
@@ -130,6 +131,9 @@ static void opensl_callback(SLAndroidSimpleBufferQueueItf bq, void *context)
     osl_data *data = Device->ExtraData;
     ALvoid *buf;
     SLresult result;
+
+    if (data->stopping)
+    	return;
 
     buf = (ALbyte*)data->buffer + data->curBuffer*data->bufferSize;
     aluMixData(Device, buf, data->bufferSize/data->frameSize);
@@ -220,6 +224,8 @@ static void opensl_close_playback(ALCdevice *Device)
     Device->ExtraData = NULL;
 }
 
+extern int GiderosOpenALConfig_sampleRate;
+
 static ALCboolean opensl_reset_playback(ALCdevice *Device)
 {
     osl_data *data = Device->ExtraData;
@@ -233,11 +239,11 @@ static ALCboolean opensl_reset_playback(ALCdevice *Device)
     SLresult result;
 
 
-    Device->UpdateSize = (ALuint64)Device->UpdateSize * 44100 / Device->Frequency;
+    Device->UpdateSize = (ALuint64)Device->UpdateSize * GiderosOpenALConfig_sampleRate / Device->Frequency;
     Device->UpdateSize = Device->UpdateSize * Device->NumUpdates / 2;
     Device->NumUpdates = 2;
 
-    Device->Frequency = 44100;
+    Device->Frequency = GiderosOpenALConfig_sampleRate;
     Device->FmtChans = DevFmtStereo;
     Device->FmtType = DevFmtShort;
 
@@ -319,11 +325,13 @@ static ALCboolean opensl_start_playback(ALCdevice *Device)
         }
     }
     /* enqueue the first buffer to kick off the callbacks */
+    data->stopping=AL_FALSE;
     for(i = 0;i < Device->NumUpdates;i++)
     {
         if(SL_RESULT_SUCCESS == result)
         {
             ALvoid *buf = (ALbyte*)data->buffer + i*data->bufferSize;
+            aluMixData(Device, buf, data->bufferSize/data->frameSize);
             result = VCALL(bufferQueue,Enqueue)(buf, data->bufferSize);
             PRINTERR(result, "bufferQueue->Enqueue");
         }
@@ -381,6 +389,7 @@ static void opensl_stop_playback(ALCdevice *Device)
     }
     if(SL_RESULT_SUCCESS == result)
     {
+        data->stopping=AL_FALSE;
         SLAndroidSimpleBufferQueueState state;
         do {
             althrd_yield();
