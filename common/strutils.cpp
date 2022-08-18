@@ -45,9 +45,11 @@ namespace al {
 
 al::optional<std::string> getenv(const char *envname)
 {
+#if WINAPI_FAMILY == WINAPI_FAMILY_DESKTOP_APP
     const char *str{std::getenv(envname)};
     if(str && str[0] != '\0')
         return al::make_optional<std::string>(str);
+#endif
     return al::nullopt;
 }
 

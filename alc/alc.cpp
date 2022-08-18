@@ -154,6 +154,9 @@
 #ifdef HAVE_WAVE
 #include "backends/wave.h"
 #endif
+#ifdef HAVE_XAUDIO2
+#include "backends/xaudio2.h"
+#endif
 
 #ifdef ALSOFT_EAX
 #include "al/eax/globals.h"
@@ -249,6 +252,9 @@ BackendInfo BackendList[] = {
 #endif
 #ifdef HAVE_SDL2
     { "sdl2", SDL2BackendFactory::getFactory },
+#endif
+#ifdef HAVE_XAUDIO2
+    { "xaudio2", XAudio2BackendFactory::getFactory },
 #endif
 
     { "null", NullBackendFactory::getFactory },
