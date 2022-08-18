@@ -100,6 +100,7 @@ struct ALsource {
      * rather than clockwise.
      */
     std::array<float,2> StereoPan{{al::numbers::pi_v<float>/6.0f, -al::numbers::pi_v<float>/6.0f}};
+    float StereoBalance{0.0f};
 
     float Radius{0.0f};
     float EnhWidth{0.593f};

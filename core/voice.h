@@ -137,6 +137,7 @@ struct VoiceProps {
     float DopplerFactor;
 
     std::array<float,2> StereoPan;
+    float StereoBalance;
 
     float Radius;
     float EnhWidth;

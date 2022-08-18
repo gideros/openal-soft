@@ -147,6 +147,7 @@ void UpdateSourceProps(const ALsource *source, Voice *voice, ALCcontext *context
     props->DopplerFactor = source->DopplerFactor;
 
     props->StereoPan = source->StereoPan;
+    props->StereoBalance = source->StereoBalance;
 
     props->Radius = source->Radius;
     props->EnhWidth = source->EnhWidth;
@@ -904,6 +905,8 @@ ALenum ALenumFromDistanceModel(DistanceModel model)
 enum SourceProp : ALenum {
     srcPitch = AL_PITCH,
     srcGain = AL_GAIN,
+	srcDirectGain = AL_DIRECT_GAIN,
+	srcBalance = AL_BALANCE,
     srcMinGain = AL_MIN_GAIN,
     srcMaxGain = AL_MAX_GAIN,
     srcMaxDistance = AL_MAX_DISTANCE,
@@ -987,6 +990,8 @@ ALuint FloatValsByProp(ALenum prop)
     {
     case AL_PITCH:
     case AL_GAIN:
+    case AL_DIRECT_GAIN:
+    case AL_BALANCE:
     case AL_MIN_GAIN:
     case AL_MAX_GAIN:
     case AL_MAX_DISTANCE:
@@ -1054,6 +1059,8 @@ ALuint DoubleValsByProp(ALenum prop)
     {
     case AL_PITCH:
     case AL_GAIN:
+    case AL_DIRECT_GAIN:
+    case AL_BALANCE:
     case AL_MIN_GAIN:
     case AL_MAX_GAIN:
     case AL_MAX_DISTANCE:
@@ -1207,6 +1214,20 @@ void SetSourcefv(ALsource *Source, ALCcontext *Context, SourceProp prop,
         CHECKVAL(values[0] >= 0.0f);
 
         Source->Gain = values[0];
+        return UpdateSourceProps(Source, Context);
+
+    case AL_BALANCE:
+        CHECKSIZE(values, 1);
+        CHECKVAL(values[0] >= -1.0f && values[0] <= 1.0f);
+
+        Source->StereoBalance = values[0];
+        return UpdateSourceProps(Source, Context);
+
+     case AL_DIRECT_GAIN:
+        CHECKSIZE(values, 1);
+        CHECKVAL(values[0] >= 0.0f);
+
+        Source->Direct.Gain = values[0];
         return UpdateSourceProps(Source, Context);
 
     case AL_MAX_DISTANCE:
@@ -1685,6 +1706,8 @@ void SetSourceiv(ALsource *Source, ALCcontext *Context, SourceProp prop,
     case AL_CONE_OUTER_ANGLE:
     case AL_PITCH:
     case AL_GAIN:
+    case AL_DIRECT_GAIN:
+    case AL_BALANCE:
     case AL_MIN_GAIN:
     case AL_MAX_GAIN:
     case AL_REFERENCE_DISTANCE:
@@ -1801,6 +1824,8 @@ void SetSourcei64v(ALsource *Source, ALCcontext *Context, SourceProp prop,
     case AL_CONE_OUTER_ANGLE:
     case AL_PITCH:
     case AL_GAIN:
+    case AL_DIRECT_GAIN:
+    case AL_BALANCE:
     case AL_MIN_GAIN:
     case AL_MAX_GAIN:
     case AL_REFERENCE_DISTANCE:
@@ -1878,6 +1903,16 @@ bool GetSourcedv(ALsource *Source, ALCcontext *Context, SourceProp prop, const a
     case AL_GAIN:
         CHECKSIZE(values, 1);
         values[0] = Source->Gain;
+        return true;
+
+    case AL_DIRECT_GAIN:
+        CHECKSIZE(values, 1);
+        values[0] = Source->Direct.Gain;
+        return true;
+
+    case AL_BALANCE:
+        CHECKSIZE(values, 1);
+        values[0] = Source->StereoBalance;
         return true;
 
     case AL_PITCH:
@@ -2191,6 +2226,8 @@ bool GetSourceiv(ALsource *Source, ALCcontext *Context, SourceProp prop, const a
     case AL_CONE_OUTER_ANGLE:
     case AL_PITCH:
     case AL_GAIN:
+    case AL_DIRECT_GAIN:
+    case AL_BALANCE:
     case AL_MIN_GAIN:
     case AL_MAX_GAIN:
     case AL_REFERENCE_DISTANCE:
@@ -2308,6 +2345,8 @@ bool GetSourcei64v(ALsource *Source, ALCcontext *Context, SourceProp prop, const
     case AL_CONE_OUTER_ANGLE:
     case AL_PITCH:
     case AL_GAIN:
+    case AL_DIRECT_GAIN:
+    case AL_BALANCE:
     case AL_MIN_GAIN:
     case AL_MAX_GAIN:
     case AL_REFERENCE_DISTANCE:
@@ -3598,6 +3637,7 @@ ALsource::ALsource()
     Direct.HFReference = LOWPASSFREQREF;
     Direct.GainLF = 1.0f;
     Direct.LFReference = HIGHPASSFREQREF;
+    StereoBalance = 0.0f;
     for(auto &send : Send)
     {
         send.Slot = nullptr;
