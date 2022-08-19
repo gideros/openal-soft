@@ -157,6 +157,9 @@
 #ifdef HAVE_XAUDIO2
 #include "backends/xaudio2.h"
 #endif
+#ifdef HAVE_WEBAUDIO
+#include "backends/webaudio.h"
+#endif
 
 #ifdef ALSOFT_EAX
 #include "al/eax/globals.h"
@@ -256,6 +259,9 @@ BackendInfo BackendList[] = {
 #ifdef HAVE_XAUDIO2
     { "xaudio2", XAudio2BackendFactory::getFactory },
 #endif
+#ifdef HAVE_WEBAUDIO
+    { "webaudio", WebAudioBackendFactory::getFactory },
+#endif
 
     { "null", NullBackendFactory::getFactory },
 #ifdef HAVE_WAVE
@@ -305,6 +311,7 @@ const struct {
 
     DECL(alcDevicePauseSOFT),
     DECL(alcDeviceResumeSOFT),
+    DECL(alcDeviceTickSOFT),
 
     DECL(alcGetStringiSOFT),
     DECL(alcResetDeviceSOFT),
@@ -3864,6 +3871,21 @@ START_API_FUNC
 }
 END_API_FUNC
 
+/**
+ * Tick the device, whatever that means for the driver. Currently used by webaudio. Driver should be ticked fast enough to allow smotth audio playback.
+ */
+FORCE_ALIGN ALC_API void ALC_APIENTRY alcDeviceTickSOFT(ALCdevice *device)
+START_API_FUNC
+{
+    if(!device)
+        alcSetError(device, ALC_INVALID_DEVICE);
+    else
+    {
+        if(device->Flags.test(DeviceRunning))
+            device->Backend->tick();
+    }
+}
+END_API_FUNC
 
 /************************************************
  * ALC DSP pause/resume functions

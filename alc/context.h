@@ -152,7 +152,11 @@ struct ALCcontext : public al::intrusive_ref<ALCcontext>, ContextBase {
 
 private:
     /* Thread-local current context. */
+#ifdef __EMSCRIPTEN__ /* Emscripten has issues with this, not sure why. Assume we are single threaded anyhow */
+    static ALCcontext *sLocalContext;
+#else
     static thread_local ALCcontext *sLocalContext;
+#endif
 
     /* Thread-local context handling. This handles attempting to release the
      * context which may have been left current when the thread is destroyed.

@@ -418,6 +418,7 @@ typedef void (ALC_APIENTRY*LPALCDEVICERESUMESOFT)(ALCdevice *device);
 #ifdef AL_ALEXT_PROTOTYPES
 ALC_API void ALC_APIENTRY alcDevicePauseSOFT(ALCdevice *device);
 ALC_API void ALC_APIENTRY alcDeviceResumeSOFT(ALCdevice *device);
+ALC_API void ALC_APIENTRY alcDeviceTickSOFT(ALCdevice *device);
 #endif
 #endif
 

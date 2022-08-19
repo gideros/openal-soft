@@ -25,6 +25,7 @@ struct BackendBase {
     virtual bool reset();
     virtual void start() = 0;
     virtual void stop() = 0;
+    virtual void tick();
 
     virtual void captureSamples(al::byte *buffer, uint samples);
     virtual uint availableSamples();

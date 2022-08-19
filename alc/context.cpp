@@ -85,7 +85,12 @@ constexpr ALchar alExtList[] =
 
 std::atomic<ALCcontext*> ALCcontext::sGlobalContext{nullptr};
 
+#ifdef __EMSCRIPTEN__
+ALCcontext *ALCcontext::sLocalContext{nullptr};
+#else
 thread_local ALCcontext *ALCcontext::sLocalContext{nullptr};
+#endif
+
 ALCcontext::ThreadCtx::~ThreadCtx()
 {
     if(ALCcontext *ctx{ALCcontext::sLocalContext})

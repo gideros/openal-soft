@@ -41,9 +41,6 @@
 
 #include <xaudio2.h>
 
-extern IXAudio2* g_audioengine;
-extern IXAudio2MasteringVoice* g_masteringvoice;
-
 namespace {
 
 #ifdef _WIN32

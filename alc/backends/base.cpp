@@ -24,6 +24,8 @@
 bool BackendBase::reset()
 { throw al::backend_exception{al::backend_error::DeviceError, "Invalid BackendBase call"}; }
 
+void BackendBase::tick() { }
+
 void BackendBase::captureSamples(al::byte*, uint)
 { }
 

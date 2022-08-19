@@ -1,9 +1,9 @@
-#ifndef BACKENDS_XAUDIO2_H
-#define BACKENDS_XAUDIO2_H
+#ifndef BACKENDS_WEBAUDIO_H
+#define BACKENDS_WEBAUDIO_H
 
 #include "base.h"
 
-struct XAudio2BackendFactory final : public BackendFactory {
+struct WebAudioBackendFactory final : public BackendFactory {
 public:
     bool init() override;
 
@@ -16,4 +16,4 @@ public:
     static BackendFactory &getFactory();
 };
 
-#endif /* BACKENDS_XAUDIO2_H */
+#endif /* BACKENDS_WEBAUDIO_H */
