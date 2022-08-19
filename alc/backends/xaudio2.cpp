@@ -60,6 +60,10 @@ struct XAudio2Backend final : public BackendBase {
 	XAudio2Backend(DeviceBase* device) noexcept;
 	~XAudio2Backend() override;
 
+	IXAudio2* audioengine;
+	IXAudio2MasteringVoice* masteringvoice;
+	IXAudio2SourceVoice* source;
+
 	VoiceCallback* callback;
 	void mix(int len) noexcept;
 
@@ -68,7 +72,6 @@ struct XAudio2Backend final : public BackendBase {
 	void start() override;
 	void stop() override;
 
-	IXAudio2SourceVoice* source;
 	uint mDeviceID{ 0 };
 	uint mFrameSize{ 0 };
 
@@ -101,17 +104,21 @@ public:
 
 XAudio2Backend::XAudio2Backend(DeviceBase* device) noexcept : BackendBase{ device }
 {
+	XAudio2Create(&audioengine);
+	HRESULT hr = audioengine->CreateMasteringVoice(&masteringvoice);
+	source = nullptr;
 	callback = new VoiceCallback(this);
 }
 
 XAudio2Backend::~XAudio2Backend()
 {
 	delete callback;
-/*    if (mDeviceID)
-        SDL_CloseAudioDevice(mDeviceID); */
+	audioengine->Release();
+	masteringvoice->DestroyVoice();
+	if (source)
+		source->DestroyVoice();
 	if (mBuffer != NULL)
 		delete[] mBuffer;
-	mDeviceID = 0;
 }
 
 void XAudio2Backend::mix(int len) noexcept
@@ -157,19 +164,7 @@ void XAudio2Backend::open(const char *name)
 	wf.nBlockAlign = wf.wBitsPerSample * wf.nChannels / 8;
 	wf.cbSize = 0;
 
-	g_audioengine->CreateSourceVoice(&source, &wf, 0, XAUDIO2_DEFAULT_FREQ_RATIO, callback, NULL, NULL);
-	/*
-    switch(mDevice->FmtType)
-    {
-    case DevFmtUByte: want.format = AUDIO_U8; break;
-    case DevFmtByte: want.format = AUDIO_S8; break;
-    case DevFmtUShort: want.format = AUDIO_U16SYS; break;
-    case DevFmtShort: want.format = AUDIO_S16SYS; break;
-    case DevFmtUInt:
-    case DevFmtInt: want.format = AUDIO_S32SYS; break;
-    case DevFmtFloat: want.format = AUDIO_F32; break;
-    }
-	*/
+	audioengine->CreateSourceVoice(&source, &wf, 0, XAUDIO2_DEFAULT_FREQ_RATIO, callback, NULL, NULL);
 
 	DevFmtType devtype = DevFmtShort;
     mFrameSize = BytesFromDevFmt(devtype) * wf.nChannels;
