@@ -121,6 +121,7 @@ static int EventThread(ALCcontext *context)
 
 void StartEventThrd(ALCcontext *ctx)
 {
+#ifndef __EMSCRIPTEN__
     try {
         ctx->mEventThread = std::thread{EventThread, ctx};
     }
@@ -130,6 +131,7 @@ void StartEventThrd(ALCcontext *ctx)
     catch(...) {
         ERR("Failed to start event thread! Expect problems.\n");
     }
+#endif
 }
 
 void StopEventThrd(ALCcontext *ctx)
@@ -147,8 +149,10 @@ void StopEventThrd(ALCcontext *ctx)
     ring->writeAdvance(1);
 
     ctx->mEventSem.post();
+#ifndef __EMSCRIPTEN__
     if(ctx->mEventThread.joinable())
         ctx->mEventThread.join();
+#endif
 }
 
 AL_API void AL_APIENTRY alEventControlSOFT(ALsizei count, const ALenum *types, ALboolean enable)
