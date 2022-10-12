@@ -186,12 +186,14 @@ bool XAudio2Backend::reset()
 
 void XAudio2Backend::start()
 {
-	source->Start();
+	if (source)
+		source->Start();
 }
 
 void XAudio2Backend::stop()
 {
-	source->Stop();
+	if (source)
+		source->Stop();
 }
 
 } // namespace
