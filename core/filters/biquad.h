@@ -105,6 +105,15 @@ public:
     void setParamsFromBandwidth(BiquadType type, Real f0norm, Real gain, Real bandwidth)
     { setParams(type, f0norm, gain, rcpQFromBandwidth(f0norm, bandwidth)); }
 
+    void setParamsFromCoefficients(const float *c)
+    {
+        mB0 = c[0];
+        mB1 = c[1];
+        mB2 = c[2];
+        mA1 = c[3];
+        mA2 = c[4];
+    }
+
     void copyParamsFrom(const BiquadFilterR &other)
     {
         mB0 = other.mB0;

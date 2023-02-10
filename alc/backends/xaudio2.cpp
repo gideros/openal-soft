@@ -41,8 +41,6 @@
 
 #include <xaudio2.h>
 
-namespace {
-
 #ifdef _WIN32
 #define DEVNAME_PREFIX "OpenAL Soft on "
 #else
@@ -90,13 +88,13 @@ public:
 	VoiceCallback(XAudio2Backend* backend) : master(backend) {}
 	~VoiceCallback() { }
 
-	void STDMETHODCALLTYPE OnStreamEnd() { ; }
-	void STDMETHODCALLTYPE OnVoiceProcessingPassEnd() { }
-	void STDMETHODCALLTYPE OnVoiceProcessingPassStart(UINT32 SamplesRequired) { master->mix(SamplesRequired); }
-	void STDMETHODCALLTYPE OnBufferEnd(void* pBufferContext) { }
-	void STDMETHODCALLTYPE OnBufferStart(void* pBufferContext) {    }
-	void STDMETHODCALLTYPE OnLoopEnd(void* pBufferContext) {    }
-	void STDMETHODCALLTYPE OnVoiceError(void* pBufferContext, HRESULT Error) { }
+	STDMETHOD_(void,OnStreamEnd()) { ; }
+	STDMETHOD_(void, OnVoiceProcessingPassEnd(THIS)) { }
+	STDMETHOD_(void, OnVoiceProcessingPassStart(THIS_ UINT32 SamplesRequired)) { master->mix(SamplesRequired); }
+	STDMETHOD_(void, OnBufferEnd(THIS_ void* pBufferContext)) { }
+	STDMETHOD_(void, OnBufferStart(THIS_ void* pBufferContext)) {    }
+	STDMETHOD_(void, OnLoopEnd(THIS_ void* pBufferContext)) {    }
+	STDMETHOD_(void, OnVoiceError(THIS_ void* pBufferContext, HRESULT Error)) { }
 };
 
 XAudio2Backend::XAudio2Backend(DeviceBase* device) noexcept : BackendBase{ device }
@@ -196,7 +194,189 @@ void XAudio2Backend::stop()
 		source->Stop();
 }
 
-} // namespace
+#include <chrono>
+#include <ppltasks.h>
+#include <mutex>
+#include <Windows.Media.Capture.h>
+#include <Windows.Media.MediaProperties.h>
+#include <Windows.Storage.Streams.h>
+using namespace Concurrency;
+
+using namespace Windows::Media::Capture;
+using namespace Windows::Media::MediaProperties;
+using namespace Windows::Storage::Streams;
+
+struct XAudio2Capture;
+
+ref class XAudio2Delegates sealed {
+	XAudio2Capture* capture;
+internal:
+	XAudio2Delegates(XAudio2Capture* cap) { capture=cap; };
+public:
+	void OnFailed(Windows::Media::Capture::MediaCapture^ sender, Windows::Media::Capture::MediaCaptureFailedEventArgs^ errorEventArgs);
+};
+
+//This is called XAudio2, because it is supposed to be UWP driver, but XAudio2 doesn't handle capture at all. We'll use MediaCapture instead
+struct XAudio2Capture final : public BackendBase {
+	XAudio2Capture(DeviceBase* device) noexcept;
+	~XAudio2Capture() override;
+
+	MediaCapture ^capture{ nullptr };
+	IRandomAccessStream^ buffer{ nullptr };
+	IInputStream^ instream{ nullptr };
+	XAudio2Delegates^ delegates;
+	bool record{ false };
+
+	void open(const char* name) override;
+	void start() override;
+	void stop() override;
+	void captureSamples(al::byte* buffer, uint samples) override;
+	uint availableSamples() override;
+
+	void failed();
+
+	BYTE mBuffer[8192];
+	size_t mSkip{ 0 };
+	size_t mBufferSize{ 0 };
+	size_t mFrameSize{ 0 };
+	std::recursive_mutex mutex;
+
+	DEF_NEWDEL(XAudio2Capture)
+};
+
+void XAudio2Delegates::OnFailed(Windows::Media::Capture::MediaCapture^ sender, Windows::Media::Capture::MediaCaptureFailedEventArgs^ errorEventArgs)
+{
+	capture->failed();
+}
+
+XAudio2Capture::XAudio2Capture(DeviceBase* device) noexcept : BackendBase{ device }
+{
+	delegates = ref new XAudio2Delegates(this);
+}
+
+XAudio2Capture::~XAudio2Capture()
+{
+	stop();
+	delegates = nullptr;
+}
+
+void XAudio2Capture::captureSamples(al::byte* buffer, uint samples)
+{
+	int nsmp = availableSamples();
+	if (samples > nsmp) samples = nsmp;
+	if (!samples) return;
+	size_t tt = samples * mFrameSize;
+	mutex.lock();
+	memcpy(buffer, mBuffer+mSkip, tt);
+	memmove(mBuffer, mBuffer + mSkip + tt, mBufferSize - mSkip - tt);
+	mBufferSize -= tt;
+	mutex.unlock();
+}
+
+uint XAudio2Capture::availableSamples()
+{
+	if (!record) return 0;
+	mutex.lock();
+	size_t cur = std::max(mBufferSize - mSkip, (size_t)0) / mFrameSize;
+	size_t room = sizeof(mBuffer) - mBufferSize;
+	mutex.unlock();
+	if (room > 1024) {
+		IBuffer^ buf = ref new Buffer(room);
+		create_task(instream->ReadAsync(buf, room, InputStreamOptions::Partial)).then([=](IBuffer^ ibuf)
+		{
+			size_t blen = ibuf->Length;
+			auto reader = Windows::Storage::Streams::DataReader::FromBuffer(ibuf);
+			mutex.lock();
+			reader->ReadBytes(
+				::Platform::ArrayReference<BYTE>(
+					mBuffer+mBufferSize, blen));
+			mBufferSize += blen;
+			mutex.unlock();
+		});
+	}
+	return cur;
+}
+
+void XAudio2Capture::failed()
+{
+	stop();
+}
+
+void XAudio2Capture::open(const char* name)
+{
+	DevFmtType devtype = DevFmtShort;
+	mFrameSize = BytesFromDevFmt(devtype) * 2;
+	mDevice->DeviceName = name ? name : defaultDeviceName;
+}
+
+void XAudio2Capture::start()
+{
+	if (!record) {
+		buffer = ref new InMemoryRandomAccessStream();
+		if (capture != nullptr)
+		{
+			capture->StopRecordAsync();
+		}
+		try {
+			MediaCaptureInitializationSettings^ settings = ref new MediaCaptureInitializationSettings();
+			settings->StreamingCaptureMode = StreamingCaptureMode::Audio;
+			settings->AudioDeviceId = Windows::Media::Devices::MediaDevice::GetDefaultAudioCaptureId(Windows::Media::Devices::AudioDeviceRole::Default);
+
+			capture = ref new MediaCapture();
+			create_task(capture->InitializeAsync(settings)).then([this](void)
+			{
+				capture->Failed += ref new Windows::Media::Capture::MediaCaptureFailedEventHandler(delegates, &XAudio2Delegates::OnFailed);
+				mBufferSize = 0;
+				mSkip = 82; 
+				return capture->StartRecordToStreamAsync(MediaEncodingProfile::CreateWav(AudioEncodingQuality::High), buffer);
+			}).then([this](void) {
+				instream = buffer->GetInputStreamAt(0);
+				record = true;
+			}).then([this](task<void> t) {
+				try
+				{
+					t.get();
+				}
+				catch (Platform::Exception^ e)
+				{
+					instream = nullptr;
+					buffer = nullptr;
+					capture = nullptr;
+					record = false;
+				}
+			});
+			while (buffer&&(!record))
+				std::this_thread::sleep_for(std::chrono::milliseconds(1));
+		}
+		catch (Platform::Exception^ e)
+		{
+			instream = nullptr;
+			buffer = nullptr;
+			capture = nullptr;
+		}
+	}
+}
+
+void XAudio2Capture::stop()
+{
+	if (record) {
+		if (capture)
+		{
+			create_task(capture->StopRecordAsync()).then([=]()
+			{
+				record = false;
+				buffer = nullptr;
+				capture = nullptr;
+				instream = nullptr;
+			});
+			while (buffer)
+				std::this_thread::sleep_for(std::chrono::milliseconds(1));
+		}
+		else
+			record = false;
+	}
+}
+
 
 BackendFactory & XAudio2BackendFactory::getFactory()
 {
@@ -211,35 +391,25 @@ bool XAudio2BackendFactory::init()
 
 bool XAudio2BackendFactory::querySupport(BackendType type)
 {
-	return type == BackendType::Playback;
+	return type == BackendType::Playback || type == BackendType::Capture;
 }
 
 std::string XAudio2BackendFactory::probe(BackendType type)
 {
     std::string outnames;
 
-    if(type != BackendType::Playback)
-        return outnames;
-
-    //int num_devices{SDL_GetNumAudioDevices(SDL_FALSE)};
-
     /* Includes null char. */
     outnames.append(defaultDeviceName, sizeof(defaultDeviceName));
-	/*
-    for(int i{0};i < num_devices;++i)
-    {
-        std::string name{DEVNAME_PREFIX};
-        name += SDL_GetAudioDeviceName(i, SDL_FALSE);
-        if(!name.empty())
-            outnames.append(name.c_str(), name.length()+1);
-    }
-	*/
+
     return outnames;
 }
 
 BackendPtr XAudio2BackendFactory::createBackend(DeviceBase *device, BackendType type)
 {
-    if(type == BackendType::Playback)
-        return BackendPtr{new XAudio2Backend{device}};
-    return nullptr;
+	if (type == BackendType::Playback)
+		return BackendPtr{ new XAudio2Backend{device} };
+	if (type == BackendType::Capture)
+		return BackendPtr{ new XAudio2Capture{device} };
+	return nullptr;
 }
+

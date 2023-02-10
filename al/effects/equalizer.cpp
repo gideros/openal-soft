@@ -25,6 +25,7 @@ void Equalizer_setParamiv(EffectProps*, ALenum param, const int*)
 }
 void Equalizer_setParamf(EffectProps *props, ALenum param, float val)
 {
+    props->Equalizer.useRawCoefficients=false;
     switch(param)
     {
     case AL_EQUALIZER_LOW_GAIN:
@@ -92,7 +93,16 @@ void Equalizer_setParamf(EffectProps *props, ALenum param, float val)
     }
 }
 void Equalizer_setParamfv(EffectProps *props, ALenum param, const float *vals)
-{ Equalizer_setParamf(props, param, vals[0]); }
+{
+    if (param==AL_EQUALIZER_BIQUADS) {
+        props->Equalizer.useRawCoefficients=true;
+        for (size_t k=0;k<(4*5);k++)
+            props->Equalizer.coefs[k]=vals[k];
+    }
+    else {
+        Equalizer_setParamf(props, param, vals[0]);
+    }
+}
 
 void Equalizer_getParami(const EffectProps*, ALenum param, int*)
 { throw effect_exception{AL_INVALID_ENUM, "Invalid equalizer integer property 0x%04x", param}; }

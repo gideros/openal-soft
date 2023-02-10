@@ -145,6 +145,7 @@ extern "C" {
 #define AL_EQUALIZER_MID2_WIDTH                  0x0008
 #define AL_EQUALIZER_HIGH_GAIN                   0x0009
 #define AL_EQUALIZER_HIGH_CUTOFF                 0x000A
+#define AL_EQUALIZER_BIQUADS                     0x000B
 
 /* Effect type */
 #define AL_EFFECT_FIRST_PARAMETER                0x0000

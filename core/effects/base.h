@@ -138,6 +138,9 @@ union EffectProps {
         float Mid2Width;
         float HighCutoff;
         float HighGain;
+        // raw biquads
+        bool useRawCoefficients;
+        float coefs[4*5]; //b0,b1,b2,a1,a2 x 4 biquads
     } Equalizer;
 
     struct {
