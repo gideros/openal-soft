@@ -277,7 +277,7 @@ uint XAudio2Capture::availableSamples()
 {
 	if (!record) return 0;
 	mutex.lock();
-	size_t cur = std::max(mBufferSize - mSkip, (size_t)0) / mFrameSize;
+	size_t cur = ((mBufferSize>mSkip)?(mBufferSize - mSkip):(size_t)0) / mFrameSize;
 	size_t room = sizeof(mBuffer) - mBufferSize;
 	mutex.unlock();
 	if (room > 1024) {
@@ -305,7 +305,7 @@ void XAudio2Capture::failed()
 void XAudio2Capture::open(const char* name)
 {
 	DevFmtType devtype = DevFmtShort;
-	mFrameSize = BytesFromDevFmt(devtype) * 2;
+	mFrameSize = BytesFromDevFmt(devtype); //Mono ?
 	mDevice->DeviceName = name ? name : defaultDeviceName;
 }
 
